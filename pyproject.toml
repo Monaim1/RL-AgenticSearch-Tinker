@@ -6,4 +6,11 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "verifiers>=0.1.7.post0",
+    "trl>=0.11.0",
+    "transformers>=4.44.0",
+    "accelerate>=0.33.0",
+    "datasets>=2.19.0",
+    "chromadb>=0.5.0",
+    "wandb>=0.23.0",
+    "python-dotenv>=1.0.0",
 ]
