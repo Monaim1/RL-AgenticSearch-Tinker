@@ -5,6 +5,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from dotenv import load_dotenv
 import dspy
+from openai import OpenAI
 
 import dspy
 lm = dspy.LM('gemini/gemini-2.5-pro-preview-03-25', api_key='GEMINI_API_KEY')
@@ -18,6 +19,37 @@ def get_LLM_client():
     if not api_key:
         raise Exception("Missing GEMINI_API_KEY (or GOOGLE_API_KEY) in environment")
     return {"base_url": base_url, "api_key": api_key}
+
+
+def get_vllm_client(
+    base_url: str = "http://localhost:8000/v1",
+    api_key: str = "ollama"
+) -> OpenAI:
+    """Get OpenAI client configured for local vLLM server."""
+    return OpenAI(base_url=base_url, api_key=api_key)
+
+
+def query_vllm(
+    prompt: str,
+    model: str = "Qwen/Qwen3-0.6B",
+    max_tokens: int = 2048,
+    temperature: float = 0.7,
+    messages: list = None
+) -> str:
+    """Query the local vLLM server for text generation."""
+    client = get_vllm_client()
+    
+    if messages is None:
+        messages = [{"role": "user", "content": prompt}]
+    
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )
+    
+    return response.choices[0].message.content
 
 DEFAULT_SYSTEM_PROMPT = (
     "you are gonna be given an abtract of a patent and you need to generate 3 queries that"

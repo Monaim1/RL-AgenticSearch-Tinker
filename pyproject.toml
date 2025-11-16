@@ -18,4 +18,7 @@ dependencies = [
     "sentence-transformers>=5.1.2",
     "openpipe-art>=0.4.5",
     "dspy>=3.0.4",
+    "unsloth>=2024.8",
+    "vllm>=0.11.0",
+    "mlx-lm>=0.28.3",
 ]
