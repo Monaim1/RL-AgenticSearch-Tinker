@@ -17,4 +17,5 @@ dependencies = [
     "ipywidgets>=8.1.8",
     "sentence-transformers>=5.1.2",
     "openpipe-art>=0.4.5",
+    "dspy>=3.0.4",
 ]
