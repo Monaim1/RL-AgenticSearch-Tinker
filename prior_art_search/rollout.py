@@ -32,11 +32,9 @@ class SearchResult:
     message_id: str
     snippet: str
 
-
 class FinalAnswer(BaseModel):
     answer: str
     patent_ids: List[str]
-
 
 class ProjectTrajectory(art.Trajectory):
     # Reuse the Trajectory type from `art`, only
