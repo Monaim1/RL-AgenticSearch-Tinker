@@ -1,24 +1,30 @@
+import json
 import logging
+import inspect
+from dataclasses import dataclass
+from textwrap import dedent
+from typing import Any, Dict, List, Optional
 
-from openai import AsyncOpenAI
-from litellm import acompletion
-import weave
 from langchain_core.utils.function_calling import convert_to_openai_tool
-from tenacity import retry, stop_after_attempt
+from openai import AsyncOpenAI
+from pydantic import BaseModel
 
 import art
-from art.utils.strip_logprobs import strip_logprobs
+from prior_art_search.prior_art_tools import search_patents, lookup_patent
+
 
 MAX_TURNS = 6
+
+
 # Patent data models
 class Patent(BaseModel):
     publication_number: str
-    title: str  
+    title: str
     abstact: Optional[str] = None
     main_ipcr_label: Optional[str] = None
-    main_cpc_label: List[str] = []  
-    decision: List[str] = []  
-    patent_issue_date: List[str] = []  
+    main_cpc_label: List[str] = []
+    decision: List[str] = []
+    patent_issue_date: List[str] = []
 
 
 @dataclass
@@ -26,52 +32,45 @@ class SearchResult:
     message_id: str
     snippet: str
 
-class FinalAnswer(BaseModel):   
+
+class FinalAnswer(BaseModel):
     answer: str
-    patent_ids: list[str]
+    patent_ids: List[str]
 
-@dataclass
-class ProjectTrajectory:
-    reward: float = 0.0
-    messages: List[dict] = field(default_factory=list)
-    tools: List[dict] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    metrics: Dict[str, float] = field(default_factory=dict)
-    final_answer: Optional[FinalAnswer] = None  # you already define this
 
-    def add_message(self, role: str, content: str, **extra: Any) -> None:
-        msg = {"role": role, "content": content}
-        msg.update(extra)
-        self.messages.append(msg)
+class ProjectTrajectory(art.Trajectory):
+    # Reuse the Trajectory type from `art`, only
+    # adding the final_answer field specific to this project.
+    final_answer: Optional[FinalAnswer] = None
+
 
 @dataclass
 class JudgeResponse:
     accept: bool
 
 
-def return_final_answer(
-        answer: str, 
-        reference_message_ids: list[str]) -> FinalAnswer:
-        """Return the final answer and the message IDs of the emails that were used to generate the answer."""
-        return FinalAnswer(answer=answer, source_ids=reference_message_ids)
+def return_final_answer(answer: str, patent_ids: List[str]) -> FinalAnswer:
+    """Return the final answer and the patent IDs that support it."""
+    return FinalAnswer(answer=answer, patent_ids=patent_ids)
 
-async def judge_correctness(scenario_row, final_answer: FinalAnswer) -> JudgeResponse:
+
+async def judge_correctness(scenario_row: Dict[str, Any], final_answer: FinalAnswer) -> JudgeResponse:
     gold = str(scenario_row["publication_number"])
     accept = gold in (final_answer.patent_ids or [])
     return JudgeResponse(accept=accept)
 
 
-# Multi‑turn rollout for prior‑art search 
-async def rollout(model, SearchScenario):
-    scenario = SearchScenario
-    
+# Multi‑turn rollout for prior‑art search
+async def rollout(model: art.Model, search_scenario: Dict[str, Any]) -> ProjectTrajectory:
+    scenario = search_scenario
+
     traj = ProjectTrajectory(
         reward=0.0,
+        messages_and_choices=[],
         metadata={
-            "SearchScenario": scenario.id,
-            "step": email_scenario.step,
-        },
+            "query": scenario.get("query")},
     )
+
     system_prompt = dedent(
         f"""
         You are a prior-art search agent. You are given a new invention description
@@ -82,7 +81,7 @@ async def rollout(model, SearchScenario):
 
         You may take up to {MAX_TURNS} turns; if your first search does not find
         the answer, refine your queries and try again.
-        you should only return publication numbers of patents that are relevant
+        You should only return publication numbers of patents that are relevant
         to the invention description or query provided.
 
         Tools:
@@ -97,41 +96,41 @@ async def rollout(model, SearchScenario):
     )
 
     user_prompt_parts = [f"New invention description or query:\n{scenario['query']}"]
-
-    # if "abstract" in scenario and isinstance(scenario["abstract"], str):
-    #     user_prompt_parts.append(f"\nOptional additional context (abstract):\n{scenario['abstract']}")
     user_prompt = "\n".join(user_prompt_parts)
 
-    traj.add_message("system", system_prompt)
-    traj.add_message("user", user_prompt)
+    traj.messages_and_choices = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
 
     tools = [search_patents, lookup_patent, return_final_answer]
     tools_by_name = {t.__name__: t for t in tools}
 
+    # Use the same tool representation as in the `art` examples.
+    traj.tools = [convert_to_openai_tool(t) for t in tools]
+
     client = AsyncOpenAI(
-        base_url="http://localhost:8000/v1",
-        api_key="whatever"  
-        )
+        base_url=model.inference_base_url,
+        api_key=model.inference_api_key,
+    )
+
     for _ in range(MAX_TURNS):
         response = await client.chat.completions.create(
             model=model.get_inference_name(),
             temperature=1.0,
-            messages=traj.messages,
+            messages=traj.messages(),
             tools=traj.tools,
         )
 
-        choice = response.choices[0]
-        message = choice.message
-
-        # Record assistant message
-        traj.messages.append(message.model_dump(exclude_none=True))
+        response_message = response.choices[0].message
+        traj.messages_and_choices.append(response.choices[0])
 
         # No tool calls → end episode
-        if not message.tool_calls:
+        if not response_message.tool_calls:
             return traj
 
         try:
-            for tool_call in message.tool_calls:
+            for tool_call in response_message.tool_calls:
                 tool_name: str = tool_call.function.name
                 if tool_name not in tools_by_name:
                     continue
@@ -145,7 +144,7 @@ async def rollout(model, SearchScenario):
                 else:
                     result = tool_to_call(**tool_args)
 
-                traj.messages.append(
+                traj.messages_and_choices.append(
                     {
                         "role": "tool",
                         "tool_call_id": tool_call.id,
@@ -167,7 +166,7 @@ async def rollout(model, SearchScenario):
                     return traj
 
         except Exception as e:
-            print(f"Error executing tool call: {e}")
+            logging.error(f"Error executing tool call: {e}")
             return traj
 
     return traj
