@@ -161,6 +161,8 @@ async def rollout(model: art.Model, search_scenario: Dict[str, Any]) -> ProjectT
                         traj.metrics["correct"] = float(
                             correctness_judge_response.accept
                         )
+                        traj.reward = float(
+                            correctness_judge_response.accept)
                     return traj
 
         except Exception as e:
