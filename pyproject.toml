@@ -21,4 +21,8 @@ dependencies = [
     "mlx-lm>=0.28.3",
     "weave>=0.51.56",
     "langchain-core>=1.0.5",
+    "polars>=1.35.2",
+    "tblib>=3.2.2",
+    "torchtune>=0.6.1",
+    "torchao>=0.14.1",
 ]

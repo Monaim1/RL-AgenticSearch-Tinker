@@ -41,23 +41,10 @@ async def run_training(
     train_df: pd.DataFrame | None = None,
     val_df: pd.DataFrame | None = None,
 ) -> None:
-    """
-    Full training loop for the prior‑art search agent,
 
-    The rollout function is called like:
-        await rollout(model, scenario)
-    where `scenario` is a dict with at least 
-    `query` and `publication_number` keys.
-    """
-    # If datasets not provided, load from disk
-    if train_df is None or val_df is None:
-        train_df, val_df = get_train_val_sets()
-
-    # Convert DataFrames to simple dict scenarios
     training_scenarios: List[Dict[str, Any]] = train_df.to_dict(orient="records")
     validation_scenarios: List[Dict[str, Any]] = val_df.to_dict(orient="records")
 
-    # Set up the dataset iterator
     training_iterator = iterate_dataset(
         training_scenarios,
         groups_per_step=training_config["groups_per_step"],
@@ -84,7 +71,7 @@ async def run_training(
                 )
             )
 
-        # Gather all trajectory groups (run rollouts)
+        # Gather all trajectory groups (run rollouts) / the reward is already computed during rollout
         finished_train_groups = await art.gather_trajectory_groups(
             train_groups,
             pbar_desc="gather",
@@ -92,15 +79,6 @@ async def run_training(
             * len(batch.items),
         )
 
-        # Score trajectories with RULER (LLM-as-a-judge)
-        judged_groups: List[art.TrajectoryGroup] = []
-        for group in finished_train_groups:
-            judged_group = await ruler_score_group(
-                group,
-                "openai/o4-mini",
-                debug=True,
-            )
-            judged_groups.append(judged_group)
 
         # Periodic validation
         if batch.step % training_config["validation_step_interval"] == 0:
@@ -126,7 +104,7 @@ async def run_training(
         # Train the model on the judged trajectories
         await model.delete_checkpoints()
         await model.train(
-            judged_groups,
+            finished_train_groups,
             config=art.TrainConfig(
                 learning_rate=training_config["learning_rate"],
             ),
@@ -144,3 +122,5 @@ if __name__ == "__main__":
     train_df, val_df = get_train_val_sets()
     print(f"Train dataset size: {len(train_df)}")
     print(f"Validation dataset size: {len(val_df)}")
+
+    

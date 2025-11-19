@@ -10,5 +10,7 @@ wheels/
 .venv
 .chroma_db/*
 .env
-
+wandb/*
+.art
 *data*
+.DS_Store
