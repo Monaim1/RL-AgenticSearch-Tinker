@@ -4,7 +4,6 @@ import argparse
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Tuple
-
 import sys
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
@@ -38,9 +37,9 @@ def get_training_device() -> torch.device:
 
 @dataclass
 class TrainingConfig:
-    model_name: str = "Qwen/Qwen2.5-0.5B-Instruct"
-    learning_rate: float = 1e-5
-    max_steps: int = 10
+    model_name: str = "Qwen/Qwen3-1.7B-MLX-bf16" #"Qwen/Qwen2.5-0.5B-Instruct"
+    learning_rate: float = 3e-4
+    max_steps: int = 50
     groups_per_step: int = 4
     rollouts_per_group: int = 4
     per_device_batch_size: int = 1
@@ -108,7 +107,7 @@ def build_trainer(config: TrainingConfig, train_dataset: Dataset, eval_dataset: 
     grpo_args = GRPOConfig(
         output_dir="checkpoints/trl_patent_qwen",
         project="Agentic-Search-patent",
-        run_name="Agentic-Search-patent-001",
+        run_name="Agentic-Search-patent-002",
         per_device_train_batch_size=per_device_batch,
         per_device_eval_batch_size=per_device_batch,
         gradient_accumulation_steps=config.groups_per_step,

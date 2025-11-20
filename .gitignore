@@ -14,3 +14,4 @@ wandb/*
 .art
 *data*
 .DS_Store
+checkpoints/
