@@ -1,126 +1,140 @@
+from __future__ import annotations
 
-import asyncio
-from typing import Tuple, List, Dict, Any
+import argparse
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, List, Tuple
+
+import sys
+
+PACKAGE_ROOT = Path(__file__).resolve().parent
+if str(PACKAGE_ROOT.parent) not in sys.path:
+    sys.path.append(str(PACKAGE_ROOT.parent))
 
 import pandas as pd
+from datasets import Dataset
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from trl import GRPOConfig
 
-import art
-from art.rewards import ruler_score_group
-from art.utils import iterate_dataset
+from prior_art_search.rollout import (
+    PatentSearchEnv,
+    PatentSearchEnvConfig,
+    PatentSearchGRPOTrainer,
+    patent_reward_function,
+)
 
-from prior_art_search.rollout import rollout
+
+DEFAULT_DATASET_PATH = Path("Evals/patent_search_queries.csv")
 
 
-# Training config
-training_config = {
-    "groups_per_step": 2,
-    "num_epochs": 20,
-    "rollouts_per_group": 4,
-    "learning_rate": 1e-5,
-    "max_steps": 50,
-    "validation_step_interval": 5,
-}
+@dataclass
+class TrainingConfig:
+    model_name: str = "Qwen/Qwen2.5-0.5B-Instruct"
+    learning_rate: float = 1e-5
+    max_steps: int = 10
+    groups_per_step: int = 2
+    rollouts_per_group: int = 4
+    per_device_batch_size: int = 1
+    eval_interval: int = 100
+    max_prompt_length: int = 2048
+    max_completion_length: int = 1024
+    max_turns: int = 6
+    turn_max_new_tokens: int = 256
 
-def get_train_val_sets() -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Load the labeled patent search data and split into train/validation sets.
 
-    Each row has:
-      - publication_number
-      - query
-      - abstract
-    """
-    patent_search_queries = pd.read_csv("Evals/patent_search_queries.csv")
+def load_dataset(csv_path: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    patent_search_queries = pd.read_csv(csv_path)
     train_df = patent_search_queries.sample(frac=0.8, random_state=42)
     val_df = patent_search_queries.drop(train_df.index)
-    return train_df, val_df
+    return train_df.reset_index(drop=True), val_df.reset_index(drop=True)
 
 
-async def run_training(
-    model: art.TrainableModel,
-    train_df: pd.DataFrame | None = None,
-    val_df: pd.DataFrame | None = None,
-) -> None:
+def dataframe_to_dataset(df: pd.DataFrame) -> Dataset:
+    records: List[Dict[str, object]] = []
+    for row in df.to_dict(orient="records"):
+        scenario = {
+            "query": row.get("query", ""),
+            "abstract": row.get("abstract", ""),
+        }
+        records.append(
+            {
+                "prompt": row.get("query", ""),
+                "publication_number": str(row.get("publication_number", "")),
+                "scenario": scenario,
+            }
+        )
+    return Dataset.from_list(records)
 
-    training_scenarios: List[Dict[str, Any]] = train_df.to_dict(orient="records")
-    validation_scenarios: List[Dict[str, Any]] = val_df.to_dict(orient="records")
 
-    training_iterator = iterate_dataset(
-        training_scenarios,
-        groups_per_step=training_config["groups_per_step"],
-        num_epochs=training_config["num_epochs"],
-        initial_step=await model.get_step(),
+def build_trainer(config: TrainingConfig, train_dataset: Dataset, eval_dataset: Dataset):
+    tokenizer = AutoTokenizer.from_pretrained(config.model_name)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "left"
+
+    model = AutoModelForCausalLM.from_pretrained(config.model_name)
+
+    env_config = PatentSearchEnvConfig(
+        max_turns=config.max_turns,
+        turn_max_new_tokens=config.turn_max_new_tokens,
+    )
+    env = PatentSearchEnv(tokenizer=tokenizer, config=env_config)
+
+    grpo_args = GRPOConfig(
+        output_dir="checkpoints/trl_patent_qwen",
+        per_device_train_batch_size=config.per_device_batch_size,
+        per_device_eval_batch_size=config.per_device_batch_size,
+        gradient_accumulation_steps=config.groups_per_step,
+        learning_rate=config.learning_rate,
+        max_prompt_length=config.max_prompt_length,
+        max_completion_length=config.max_completion_length,
+        num_generations=config.rollouts_per_group,
+        logging_steps=1,
+        eval_strategy="steps",
+        eval_steps=config.eval_interval,
+        max_steps=config.max_steps,
+        report_to=["wandb"],
+        save_steps=config.eval_interval,
     )
 
-    for batch in training_iterator:
-        print(
-            f"Training step {batch.step}, epoch {batch.epoch}, "
-            f"epoch step {batch.epoch_step}"
-        )
-        print(f"Batch contains {len(batch.items)} scenarios")
-
-        # Create trajectory groups for this batch
-        train_groups: List[art.TrajectoryGroup] = []
-        for scenario in batch.items:
-            train_groups.append(
-                art.TrajectoryGroup(
-                    (
-                        rollout(model, scenario)
-                        for _ in range(training_config["rollouts_per_group"])
-                    )
-                )
-            )
-
-        # Gather all trajectory groups (run rollouts) / the reward is already computed during rollout
-        finished_train_groups = await art.gather_trajectory_groups(
-            train_groups,
-            pbar_desc="gather",
-            max_exceptions=training_config["rollouts_per_group"]
-            * len(batch.items),
-        )
+    trainer = PatentSearchGRPOTrainer(
+        env=env,
+        model=model,
+        reward_funcs=patent_reward_function,
+        args=grpo_args,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        processing_class=tokenizer,
+    )
+    return trainer
 
 
-        # Periodic validation
-        if batch.step % training_config["validation_step_interval"] == 0:
-            print("Running validation at step", batch.step)
-            validation_groups: List[art.TrajectoryGroup] = []
-            for scenario in validation_scenarios:
-                validation_groups.append(
-                    art.TrajectoryGroup([rollout(model, scenario)])
-                )
+def main(args: argparse.Namespace) -> None:
+    config = TrainingConfig(model_name=args.model_name)
+    train_df, val_df = load_dataset(Path(args.dataset))
+    train_dataset = dataframe_to_dataset(train_df)
+    eval_dataset = dataframe_to_dataset(val_df)
 
-            finished_validation_groups = await art.gather_trajectory_groups(
-                validation_groups,
-                pbar_desc="gather",
-                max_exceptions=training_config["rollouts_per_group"]
-                * len(validation_scenarios),
-            )
+    trainer = build_trainer(config, train_dataset, eval_dataset)
+    trainer.train()
 
-            await model.log(
-                finished_validation_groups,
-                split="val",
-            )
 
-        # Train the model on the judged trajectories
-        await model.delete_checkpoints()
-        await model.train(
-            finished_train_groups,
-            config=art.TrainConfig(
-                learning_rate=training_config["learning_rate"],
-            ),
-        )
-
-        print(f"Completed training step {batch.step}")
-
-        # Stop after max_steps to cap training length
-        if batch.step >= training_config["max_steps"]:
-            break
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Train the patent search agent with TRL GRPO")
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default=str(DEFAULT_DATASET_PATH),
+        help="Path to the labeled patent search csv.",
+    )
+    parser.add_argument(
+        "--model-name",
+        type=str,
+        default=TrainingConfig.model_name,
+        help="Base model to fine-tune.",
+    )
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
-    # Simple sanity check: just print dataset sizes.
-    train_df, val_df = get_train_val_sets()
-    print(f"Train dataset size: {len(train_df)}")
-    print(f"Validation dataset size: {len(val_df)}")
-
-    
+    main(parse_args())

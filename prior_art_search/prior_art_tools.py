@@ -1,11 +1,10 @@
 import asyncio
-from pydantic import BaseModel, Field
-from textwrap import dedent
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Optional, get_origin, get_args
-import asyncio
+from typing import List, Dict
 
-from local_patent_db import init_chroma_collection, get_chroma_semaphore
+from prior_art_search.local_patent_db import init_chroma_collection, get_chroma_semaphore
+
+
+collection = init_chroma_collection(force_recreate=False)
 
 ## search tool
 async def search_patents(query: str, n_results: int = 10) -> list[dict]:
@@ -50,11 +49,11 @@ async def lookup_patent(publication_number: str) -> dict:
     return {**patent_metadata, "abstract": patent_content}
 
 async def main():
-    collection = init_chroma_collection(force_recreate=False)
     res = await search_patents("battery management", n_results=3)
     print("Search Results:")
     for patent in res:
         print(patent)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

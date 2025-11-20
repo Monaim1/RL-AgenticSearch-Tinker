@@ -60,22 +60,29 @@ def get_IP_data():
     return ip_files
 
 
-def init_chroma_collection(force_recreate: bool = False) :
-    """Connect to an existing ChromaDB collection for patent data, or create if not exists."""
+def init_chroma_collection(force_recreate: bool = False):
+    """Connect to an existing ChromaDB collection for patent data, or create it if missing."""
     chroma_client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
-    # get the collection if it exists
-    try:
-        if force_recreate:
+
+    if force_recreate:
+        try:
             chroma_client.delete_collection(name="patent_collection")
-        collection = chroma_client.get_collection(
+        except Exception:
+            # Collection may not exist yet – ignore and recreate below.
+            pass
+
+    try:
+        return chroma_client.get_collection(
             name="patent_collection",
             embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(
                 model_name="sentence-transformers/all-mpnet-base-v2"
-            )
+            ),
         )
-        return collection
     except Exception:
-        # If not found, create and ingest
+        patent_data = get_IP_data()
+        if not patent_data:
+            raise RuntimeError("No patent data found under Patent_data/")
+
         collection = chroma_client.get_or_create_collection(
             name="patent_collection",
             embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(
@@ -85,19 +92,18 @@ def init_chroma_collection(force_recreate: bool = False) :
                 "hnsw": {
                     "space": "cosine",
                     "ef_construction": 200,
-                    "ef_search": 150
+                    "ef_search": 150,
                 }
-            }
+            },
         )
         collection.add(
-            documents=[patent["abstract"] for patent in patent_data],  # Using abstract as the main text for embeddings
+            documents=[patent.get("abstract", "") for patent in patent_data],
             ids=[patent["publication_number"] for patent in patent_data],
-            metadatas=[{k: v for k, v in patent.items() if k != 'abstract'} for patent in patent_data],
+            metadatas=[{k: v for k, v in patent.items() if k != "abstract"} for patent in patent_data],
         )
         return collection
 
 
 if __name__ == "__main__":
-    patent_data = get_IP_data()
     collection = init_chroma_collection(force_recreate=True)
     print(f"ChromaDB collection 'patent_collection' initialized with {len(collection.get()['ids'])} patents.")

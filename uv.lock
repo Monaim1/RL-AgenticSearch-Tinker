@@ -2703,21 +2703,6 @@ wheels = [
 ]
 
 [[package]]
-name = "openpipe-art"
-version = "0.5.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "litellm" },
-    { name = "openai" },
-    { name = "typer" },
-    { name = "weave" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/4c/6b/c342530c88d446e542def94804998ee26cef86805906eb9951b18c433cac/openpipe_art-0.5.2.tar.gz", hash = "sha256:a67831bd12eadc8c217848c36a5e917cd57d42c00ae325b6d5174fc78d443257", size = 7984319, upload-time = "2025-11-14T02:09:13.754Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/05/e2/b5a0ff43b4e81abfb29061e301e2eb0e5806bf242ca74f3248773cce6e75/openpipe_art-0.5.2-py3-none-any.whl", hash = "sha256:bf24bf19eb2fd1791eb49e5f25efb86324d8a01f9ba5c69e3ebdf63c84741e05", size = 168431, upload-time = "2025-11-14T02:09:11.631Z" },
-]
-
-[[package]]
 name = "opentelemetry-api"
 version = "1.38.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2990,7 +2975,6 @@ dependencies = [
     { name = "ipywidgets" },
     { name = "langchain-core" },
     { name = "mlx-lm" },
-    { name = "openpipe-art" },
     { name = "polars" },
     { name = "python-dotenv" },
     { name = "sentence-transformers" },
@@ -2998,6 +2982,7 @@ dependencies = [
     { name = "torchao" },
     { name = "torchtune" },
     { name = "transformers" },
+    { name = "trl" },
     { name = "unsloth" },
     { name = "vllm" },
     { name = "wandb" },
@@ -3014,7 +2999,6 @@ requires-dist = [
     { name = "ipywidgets", specifier = ">=8.1.8" },
     { name = "langchain-core", specifier = ">=1.0.5" },
     { name = "mlx-lm", specifier = ">=0.28.3" },
-    { name = "openpipe-art", specifier = "==0.5.2" },
     { name = "polars", specifier = ">=1.35.2" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "sentence-transformers", specifier = ">=5.1.2" },
@@ -3022,6 +3006,7 @@ requires-dist = [
     { name = "torchao", specifier = ">=0.14.1" },
     { name = "torchtune", specifier = ">=0.6.1" },
     { name = "transformers", specifier = ">=4.44.0" },
+    { name = "trl", specifier = ">=0.9.4" },
     { name = "unsloth", specifier = ">=2024.8" },
     { name = "vllm", specifier = ">=0.11.0" },
     { name = "wandb", specifier = ">=0.23.0" },
@@ -4892,6 +4877,20 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/d0/66/b1eb52839f563623d185f0927eb3530ee4d5ffe9d377cdaf5346b306689e/triton-3.4.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:31c1d84a5c0ec2c0f8e8a072d7fd150cab84a9c239eaddc6706c081bfae4eb04", size = 155560068, upload-time = "2025-07-30T19:58:37.081Z" },
     { url = "https://files.pythonhosted.org/packages/30/7b/0a685684ed5322d2af0bddefed7906674f67974aa88b0fae6e82e3b766f6/triton-3.4.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:00be2964616f4c619193cb0d1b29a99bd4b001d7dc333816073f92cf2a8ccdeb", size = 155569223, upload-time = "2025-07-30T19:58:44.017Z" },
     { url = "https://files.pythonhosted.org/packages/20/63/8cb444ad5cdb25d999b7d647abac25af0ee37d292afc009940c05b82dda0/triton-3.4.0-cp313-cp313t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:7936b18a3499ed62059414d7df563e6c163c5e16c3773678a3ee3d417865035d", size = 155659780, upload-time = "2025-07-30T19:58:51.171Z" },
+]
+
+[[package]]
+name = "trl"
+version = "0.25.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "accelerate" },
+    { name = "datasets" },
+    { name = "transformers" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/69/77/351cb85122c0eb9d14f0bf613b42e6868d8bb9347bd0f9c73ac27453a864/trl-0.25.1.tar.gz", hash = "sha256:451f0cc9146aadb46f3a755a5375668869dd93c57e936f7070a92145eb2333c7", size = 406597, upload-time = "2025-11-12T16:49:46.556Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f5/6b/bece2a5bf3216493c6fc1c5003b2654719ccb635bcabd4049da5a5caaa3e/trl-0.25.1-py3-none-any.whl", hash = "sha256:4983310e7cf7b126f46b9cf2a4006ea160f52d9627230efe74e498211039c0c7", size = 465497, upload-time = "2025-11-12T16:49:44.945Z" },
 ]
 
 [[package]]
