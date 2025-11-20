@@ -13,6 +13,7 @@ if str(PACKAGE_ROOT.parent) not in sys.path:
 
 import pandas as pd
 from datasets import Dataset
+import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import GRPOConfig
 
@@ -27,17 +28,25 @@ from prior_art_search.rollout import (
 DEFAULT_DATASET_PATH = Path("Evals/patent_search_queries.csv")
 
 
+def get_training_device() -> torch.device:
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    return torch.device("cpu")
+
+
 @dataclass
 class TrainingConfig:
     model_name: str = "Qwen/Qwen2.5-0.5B-Instruct"
     learning_rate: float = 1e-5
     max_steps: int = 10
-    groups_per_step: int = 2
+    groups_per_step: int = 4
     rollouts_per_group: int = 4
     per_device_batch_size: int = 1
     eval_interval: int = 100
-    max_prompt_length: int = 2048
-    max_completion_length: int = 1024
+    max_prompt_length: int = 10000
+    max_completion_length: int = 20048
     max_turns: int = 6
     turn_max_new_tokens: int = 256
 
@@ -72,7 +81,18 @@ def build_trainer(config: TrainingConfig, train_dataset: Dataset, eval_dataset: 
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "left"
 
-    model = AutoModelForCausalLM.from_pretrained(config.model_name)
+    device = get_training_device()
+    print(f"-------- Using device---------- : {device}")
+    dtype = torch.float16 if device.type in {"mps", "cuda"} else torch.float32
+
+    model = AutoModelForCausalLM.from_pretrained(
+        config.model_name,
+        dtype=dtype,
+    ).to(device)
+    if getattr(model.config, "use_cache", True):
+        model.config.use_cache = False
+    if hasattr(model, "gradient_checkpointing_disable"):
+        model.gradient_checkpointing_disable()
 
     env_config = PatentSearchEnvConfig(
         max_turns=config.max_turns,
@@ -80,10 +100,17 @@ def build_trainer(config: TrainingConfig, train_dataset: Dataset, eval_dataset: 
     )
     env = PatentSearchEnv(tokenizer=tokenizer, config=env_config)
 
+    # GRPO requires that the (global) batch sizes be divisible by
+    # `num_generations`. For a single-process run we enforce this by
+    # making the per-device batch size equal to `rollouts_per_group`.
+    per_device_batch = config.rollouts_per_group
+
     grpo_args = GRPOConfig(
         output_dir="checkpoints/trl_patent_qwen",
-        per_device_train_batch_size=config.per_device_batch_size,
-        per_device_eval_batch_size=config.per_device_batch_size,
+        project="Agentic-Search-patent",
+        run_name="Agentic-Search-patent-001",
+        per_device_train_batch_size=per_device_batch,
+        per_device_eval_batch_size=per_device_batch,
         gradient_accumulation_steps=config.groups_per_step,
         learning_rate=config.learning_rate,
         max_prompt_length=config.max_prompt_length,

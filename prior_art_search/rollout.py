@@ -9,9 +9,13 @@ from typing import Any, Dict, List, Optional
 
 import torch
 from transformers import PreTrainedTokenizerBase
+from transformers.generation.logits_process import (
+    InfNanRemoveLogitsProcessor,
+    LogitsProcessorList,
+)
 
 from trl.trainer.grpo_trainer import GRPOTrainer
-from trl.trainer.utils import pad
+from trl.trainer.utils import pad, nanstd
 
 from prior_art_search.prior_art_tools import lookup_patent, search_patents
 
@@ -53,6 +57,7 @@ class PatentSearchEnvConfig:
     top_p: float = 0.95
     tool_result_limit: int = 5
     tool_response_char_limit: int = 1200
+    do_sample: bool = True
 
 
 class PatentSearchEnv:
@@ -81,9 +86,9 @@ class PatentSearchEnv:
 
             After every tool call the environment will append a TOOL block containing the
             JSON response. Use that information before calling return_final_answer.
-            Keep the reasoning tight and stay under {max_turns} tool interactions.
+            Keep the reasoning tight and stay under %d tool interactions.
             """
-        ).strip().format(max_turns=self.config.max_turns)
+        ).strip() % self.config.max_turns
 
     def _initial_prompt(self, scenario: Dict[str, Any]) -> str:
         user_prompt = f"New invention description or query:\n{scenario['query'].strip()}"
@@ -166,14 +171,16 @@ class PatentSearchEnv:
                 add_special_tokens=False,
             ).to(device)
             with torch.no_grad():
+                logits_processor = LogitsProcessorList([InfNanRemoveLogitsProcessor()])
                 outputs = model.generate(
                     **inputs,
                     max_new_tokens=self.config.turn_max_new_tokens,
-                    do_sample=True,
+                    do_sample=self.config.do_sample,
                     temperature=self.config.temperature,
                     top_p=self.config.top_p,
                     eos_token_id=self.tokenizer.eos_token_id,
                     pad_token_id=self.tokenizer.pad_token_id,
+                    logits_processor=logits_processor,
                     return_dict_in_generate=True,
                     output_scores=False,
                 )
@@ -423,7 +430,7 @@ class PatentSearchGRPOTrainer(GRPOTrainer):
         for i, name in enumerate(self.reward_func_names):
             mean_rewards = torch.nanmean(rewards_per_func[:, i]).item()
             self._metrics[mode][f"rewards/{name}/mean"].append(mean_rewards)
-            std_reward = torch.nanstd(rewards_per_func[:, i]).item()
+            std_reward = nanstd(rewards_per_func[:, i]).item()
             self._metrics[mode][f"rewards/{name}/std"].append(std_reward)
         self._metrics[mode]["reward"].append(mean_grouped_rewards.mean().item())
         self._metrics[mode]["reward_std"].append(std_rewards.mean().item())
@@ -435,7 +442,9 @@ class PatentSearchGRPOTrainer(GRPOTrainer):
             self._logs["rewards"][name].extend(rewards_per_func[:, i].tolist())
         self._logs["advantages"].extend(all_process_advantages.tolist())
 
-        num_items_in_batch = sum(len(ids) for ids in completion_ids_list)
+        num_items_in_batch = torch.tensor(
+            sum(len(ids) for ids in completion_ids_list), device=device
+        )
         output = {
             "prompt_ids": prompt_ids,
             "prompt_mask": prompt_mask,
