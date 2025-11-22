@@ -37,22 +37,22 @@ def get_training_device() -> torch.device:
 
 @dataclass
 class TrainingConfig:
-    model_name: str = "Qwen/Qwen3-1.7B-MLX-bf16" #"Qwen/Qwen2.5-0.5B-Instruct"
+    model_name: str = "Qwen/Qwen3-0.6B" #"Qwen/Qwen2.5-0.5B-Instruct"
     learning_rate: float = 3e-4
-    max_steps: int = 50
+    max_steps: int = 200
     groups_per_step: int = 4
     rollouts_per_group: int = 4
     per_device_batch_size: int = 1
     eval_interval: int = 100
-    max_prompt_length: int = 10000
-    max_completion_length: int = 20048
+    max_prompt_length: int = 100000
+    max_completion_length: int = 20000
     max_turns: int = 6
-    turn_max_new_tokens: int = 256
+    turn_max_new_tokens: int = 2000
 
 
 def load_dataset(csv_path: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
     patent_search_queries = pd.read_csv(csv_path)
-    train_df = patent_search_queries.sample(frac=0.8, random_state=42)
+    train_df = patent_search_queries.sample(frac=0.85, random_state=42)
     val_df = patent_search_queries.drop(train_df.index)
     return train_df.reset_index(drop=True), val_df.reset_index(drop=True)
 
@@ -107,7 +107,7 @@ def build_trainer(config: TrainingConfig, train_dataset: Dataset, eval_dataset: 
     grpo_args = GRPOConfig(
         output_dir="checkpoints/trl_patent_qwen",
         project="Agentic-Search-patent",
-        run_name="Agentic-Search-patent-002",
+        run_name="Qwen3-0.6B-Patent-Search-GRPO",
         per_device_train_batch_size=per_device_batch,
         per_device_eval_batch_size=per_device_batch,
         gradient_accumulation_steps=config.groups_per_step,
