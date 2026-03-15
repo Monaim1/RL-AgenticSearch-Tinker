@@ -1,0 +1,15 @@
+{
+  "model": "Qwen/Qwen3.5-4B",
+  "loss_fn": "ppo",
+  "steps": 10,
+  "groups_per_batch": 1,
+  "group_size": 4,
+  "eval_batches": 0,
+  "eval_every": 1,
+  "max_turns": 6,
+  "max_tokens": 120,
+  "chroma_dir": ".chroma_db",
+  "collection_name": "patent_collection",
+  "training_logs_dir": "training_logs",
+  "wandb_project": "patent-search-tinker"
+}

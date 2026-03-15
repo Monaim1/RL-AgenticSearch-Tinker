@@ -1,0 +1,9 @@
+=== TINKER COOKBOOK RL TRAIN (PATENT) ===
+model=Qwen/Qwen3.5-4B loss_fn=ppo
+groups_per_batch=1 group_size=4 steps=1
+chroma_dir=.chroma_db collection=patent_collection
+run_dir=training_logs/runs/Qwen-Qwen3.5-4B-20260315-155810
+metrics_dir=training_logs/metrics/Qwen-Qwen3.5-4B-20260315-155810
+traces_dir=training_logs/traces/Qwen-Qwen3.5-4B-20260315-155810
+training_log=training_logs/runs/Qwen-Qwen3.5-4B-20260315-155810/training.log
+wandb: Currently logged in as: mounss (mounss-stude) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin

@@ -37,6 +37,7 @@ from tinker_cookbook.utils import logtree
 DEFAULT_CHROMA_DIR = ".chroma_db"
 DEFAULT_COLLECTION = "patent_collection"
 DEFAULT_TRAINING_LOGS_DIR = "training_logs"
+DEFAULT_CONFIG_PATH = "prior_art_search/TINKER_grpo_train.config.json"
 
 
 class Tee:
@@ -48,9 +49,21 @@ class Tee:
             stream.write(data)
         return len(data)
 
+    def writelines(self, lines: list[str]) -> None:
+        for stream in self.streams:
+            stream.writelines(lines)
+
     def flush(self) -> None:
         for stream in self.streams:
             stream.flush()
+
+    def isatty(self) -> bool:
+        return any(getattr(stream, "isatty", lambda: False)() for stream in self.streams)
+
+    def __getattr__(self, name: str) -> Any:
+        # Delegate unknown stream methods/properties (e.g., fileno, encoding)
+        # to the primary stream for compatibility with libraries like wandb.
+        return getattr(self.streams[0], name)
 
 
 def make_run_id(model_name: str) -> str:
@@ -90,6 +103,16 @@ def read_last_checkpoint(checkpoints_file: Path) -> dict[str, Any] | None:
         return json.loads(last_line)
     except json.JSONDecodeError:
         return None
+
+
+def load_json_config(config_path: str) -> dict[str, Any]:
+    path = Path(config_path)
+    if not path.exists():
+        return {}
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError(f"Config file must contain a JSON object: {path}")
+    return raw
 
 
 def canonical_pub_id(pub_id: str) -> str:
@@ -477,9 +500,15 @@ class PatentDatasetBuilder(RLDatasetBuilder):
 
 
 def parse_args() -> argparse.Namespace:
+    bootstrap_parser = argparse.ArgumentParser(add_help=False)
+    bootstrap_parser.add_argument("--config", default=DEFAULT_CONFIG_PATH)
+    bootstrap_args, _ = bootstrap_parser.parse_known_args()
+    config_defaults = load_json_config(bootstrap_args.config)
+
     parser = argparse.ArgumentParser(
         description="Patent prior-art RL training using official tinker_cookbook RL loop."
     )
+    parser.add_argument("--config", default=bootstrap_args.config)
     parser.add_argument("--model", default="Qwen/Qwen3.5-4B")
     parser.add_argument("--rank", type=int, default=16)
     parser.add_argument("--loss-fn", default="ppo", choices=["importance_sampling", "ppo"])
@@ -506,6 +535,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--remove-constant-reward-groups", action="store_true")
     parser.add_argument("--enable-trace", action="store_true")
     parser.add_argument("--max-steps-off-policy", type=int, default=-1)
+    if config_defaults:
+        valid_dests = {action.dest for action in parser._actions}
+        unknown_keys = sorted(k for k in config_defaults.keys() if k not in valid_dests)
+        if unknown_keys:
+            raise ValueError(
+                f"Unknown config keys in {bootstrap_args.config}: {unknown_keys}"
+            )
+        parser.set_defaults(**config_defaults)
     return parser.parse_args()
 
 

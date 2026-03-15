@@ -15,13 +15,5 @@
   "metrics_dir": "training_logs/metrics/Qwen-Qwen3.5-4B-20260315-155834",
   "traces_dir": "training_logs/traces/Qwen-Qwen3.5-4B-20260315-155834",
   "wandb_project": "patent-search-tinker",
-  "wandb_name": null,
-  "finished_at": "2026-03-15T15:59:19",
-  "latest_checkpoint": {
-    "name": "final",
-    "batch": 1,
-    "state_path": "tinker://260b1124-ac93-51e6-93e6-b05e2e9135c1:train:0/weights/final",
-    "sampler_path": "tinker://260b1124-ac93-51e6-93e6-b05e2e9135c1:train:0/sampler_weights/final"
-  },
-  "training_log": "training_logs/runs/Qwen-Qwen3.5-4B-20260315-155834/training.log"
+  "wandb_name": null
 }

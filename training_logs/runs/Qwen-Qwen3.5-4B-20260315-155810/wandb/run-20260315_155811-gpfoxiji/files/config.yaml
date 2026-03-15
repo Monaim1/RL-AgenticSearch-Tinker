@@ -1,0 +1,74 @@
+_wandb:
+    value:
+        cli_version: 0.23.0
+        m: []
+        python_version: 3.12.11
+        t:
+            "1":
+                - 1
+                - 92
+                - 105
+            "3":
+                - 16
+            "4": 3.12.11
+            "5": 0.23.0
+            "12": 0.23.0
+            "13": darwin-arm64
+async_config:
+    value: null
+base_url:
+    value: null
+compute_post_kl:
+    value: false
+dataset_builder:
+    value:
+        chroma_dir: .chroma_db
+        collection_name: patent_collection
+        csv_path: Evals/patent_search_queries.csv
+        eval_batches: 0
+        group_size: 4
+        groups_per_batch: 1
+        max_turns: 6
+        model_name_for_tokenizer: Qwen/Qwen3.5-4B
+        seed: 42
+        train_batches: 1
+enable_trace:
+    value: false
+eval_every:
+    value: 1
+evaluator_builders:
+    value: []
+kl_discount_factor:
+    value: 0
+kl_penalty_coef:
+    value: 0
+learning_rate:
+    value: 1e-05
+load_checkpoint_path:
+    value: null
+log_path:
+    value: training_logs/runs/Qwen-Qwen3.5-4B-20260315-155810
+lora_rank:
+    value: 16
+loss_fn:
+    value: ppo
+max_tokens:
+    value: 120
+model_name:
+    value: Qwen/Qwen3.5-4B
+num_groups_to_log:
+    value: 4
+num_substeps:
+    value: 1
+remove_constant_reward_groups:
+    value: false
+save_every:
+    value: 5
+stream_minibatch_config:
+    value: null
+temperature:
+    value: 0.7
+wandb_name:
+    value: null
+wandb_project:
+    value: patent-search-tinker
