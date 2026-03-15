@@ -4,7 +4,10 @@ import json
 import os
 import random
 import re
+import shutil
+import sys
 import time
+from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
@@ -33,6 +36,60 @@ from tinker_cookbook.utils import logtree
 
 DEFAULT_CHROMA_DIR = ".chroma_db"
 DEFAULT_COLLECTION = "patent_collection"
+DEFAULT_TRAINING_LOGS_DIR = "training_logs"
+
+
+class Tee:
+    def __init__(self, *streams: Any):
+        self.streams = streams
+
+    def write(self, data: str) -> int:
+        for stream in self.streams:
+            stream.write(data)
+        return len(data)
+
+    def flush(self) -> None:
+        for stream in self.streams:
+            stream.flush()
+
+
+def make_run_id(model_name: str) -> str:
+    model_tag = model_name.replace("/", "-")
+    ts = time.strftime("%Y%m%d-%H%M%S")
+    return f"{model_tag}-{ts}"
+
+
+def copy_if_exists(src: Path, dst: Path) -> None:
+    if src.exists():
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+
+
+def persist_run_artifacts(run_dir: Path, metrics_dir: Path, traces_dir: Path) -> None:
+    # Metrics-focused files
+    copy_if_exists(run_dir / "metrics.jsonl", metrics_dir / "metrics.jsonl")
+    copy_if_exists(run_dir / "checkpoints.jsonl", metrics_dir / "checkpoints.jsonl")
+
+    # Trace/logtree-focused files
+    for pattern in ("train_iteration_*.html", "eval_*.html", "trace_events*.jsonl"):
+        for path in run_dir.glob(pattern):
+            copy_if_exists(path, traces_dir / path.name)
+
+
+def read_last_checkpoint(checkpoints_file: Path) -> dict[str, Any] | None:
+    if not checkpoints_file.exists():
+        return None
+    last_line = ""
+    with checkpoints_file.open("r", encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                last_line = line.strip()
+    if not last_line:
+        return None
+    try:
+        return json.loads(last_line)
+    except json.JSONDecodeError:
+        return None
 
 
 def canonical_pub_id(pub_id: str) -> str:
@@ -264,7 +321,6 @@ class PatentSearchEnv(Env):
             next_ob = self._build_observation()
 
         metrics["reward"] = reward
-        metrics["tool_name"] = tool_name
         return StepResult(
             reward=reward,
             episode_done=done,
