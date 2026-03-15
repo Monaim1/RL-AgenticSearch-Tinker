@@ -1,55 +1,75 @@
 # Prior-Art Patent Search Agent
 
-An agentic, multi-turn, tool-using system for automated prior-art search over patent corpora. This project implements a reinforcement learning-based agent that leverages the Harvard USPTO Patent Dataset to identify relevant prior patents for a given invention description.
+An agentic, multi-turn, tool-using system for automated prior-art search over patent corpora.
 
+## Recommended Training Order
 
-## Project Overview
+1. **Tinker (recommended, current default)**
+2. **ART / OpenPipe ART (legacy path kept in repo)**
 
-This system builds an intelligent agent that can:
-- **Search** across a large patent database using semantic similarity
-- **Iteratively refine** search queries over multiple turns
-- **Lookup** detailed patent information
-- **Rank and return** the most relevant prior patents
+## Tinker (Recommended)
 
-The agent uses:
-- **ChromaDB** for semantic search with embeddings
-- **DSPy** for structured LLM prompting
-- **ART (Agent Reinforcement Training)** for training with RULER (LLM-as-judge) rewards
-- **Qwen3 or equivalent LLMs** for the agent backbone
+The current training entrypoint is:
 
-## Architecture
+- [TINKER_grpo_train.py](/Users/mounselam/Developer/Patent-Search/prior_art_search/TINKER_grpo_train.py)
 
-### Components
+It uses:
 
-1. **Patent Database (ChromaDB)**
-   - Persistent vector database with 100+ patents from Harvard USPTO dataset
-   - Embeddings generated using `sentence-transformers/all-mpnet-base-v2`
-   - HNSW index with cosine similarity for fast retrieval
+- `tinker_cookbook.rl.train.main(...)` (official common RL loop)
+- group rollouts + centered group advantages
+- selectable loss: `ppo` (default) or `importance_sampling`
+- local Chroma tools (`search_patents`, `lookup_patent`) through `PatentTools`
+- persistent run artifacts under `training_logs/`
 
-2. **Search Tools**
-   - `search_patents(query, n_results=10)` - Semantic search over patent abstracts
-   - `lookup_patent(publication_number)` - Retrieve full patent details
-   - `return_final_answer(answer, patent_ids)` - Format and submit final answer
+### One-time setup
 
-3. **Agent Loop**
-   - Multi-turn conversation with max 6 turns
-   - System prompt guides agent to use tools iteratively
-   - Termination on `FINAL_ANSWER` or max turns reached
+1. Put patent JSON files in `Patent_data/`.
+2. Build local Chroma collection:
 
-4. **Reward Function (RULER)**
-   - LLM-as-judge evaluation of agent trajectories
-   - Relative ranking of multiple trajectories
-   - Trains on correctness: does agent find the target patent
-
-
-### Environment Variables
-
-Create a `.env` file in the project root:
-
-```env
-WANDB_API_KEY=your_wandb_key
-GEMINI_API_KEY=your_gemini_api_key
-GEMINI_API_BASE=https://generativelanguage.googleapis.com/v1beta
-OPENAI_API_KEY=your_openai_key  # For inference
+```bash
+WANDB_API_KEY=dummy uv run python prior_art_search/local_patent_db.py
 ```
 
+3. Ensure `.env` contains:
+
+```env
+TINKER_API_KEY=...
+WANDB_API_KEY=...
+```
+
+### Default run (config-driven)
+
+Default config file:
+
+- [TINKER_grpo_train.config.json](/Users/mounselam/Developer/Patent-Search/prior_art_search/TINKER_grpo_train.config.json)
+
+Run with defaults:
+
+```bash
+uv run prior_art_search/TINKER_grpo_train.py
+```
+
+CLI flags override config values:
+
+```bash
+uv run prior_art_search/TINKER_grpo_train.py --steps 2 --group-size 3
+```
+
+### Logging layout
+
+Each run persists to:
+
+- `training_logs/runs/<run_id>/` (full raw run + `training.log`)
+- `training_logs/metrics/<run_id>/` (`metrics.jsonl`, `checkpoints.jsonl`)
+- `training_logs/traces/<run_id>/` (logtree/trace artifacts)
+- `training_logs/latest_run.json` (pointer to latest run + final checkpoint)
+
+## ART / OpenPipe ART (Legacy)
+
+ART path is still present and unchanged:
+
+- [training_loop_qwen.py](/Users/mounselam/Developer/Patent-Search/prior_art_search/training_loop_qwen.py)
+- [rollout.py](/Users/mounselam/Developer/Patent-Search/prior_art_search/rollout.py)
+- [prior_art_tools.py](/Users/mounselam/Developer/Patent-Search/prior_art_search/prior_art_tools.py)
+
+Use this path if you explicitly want the ART workflow. The default and maintained path is now Tinker.
