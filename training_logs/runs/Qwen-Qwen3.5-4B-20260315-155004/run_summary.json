@@ -1,0 +1,27 @@
+{
+  "run_id": "Qwen-Qwen3.5-4B-20260315-155004",
+  "started_at": "2026-03-15T15:50:04",
+  "model": "Qwen/Qwen3.5-4B",
+  "loss_fn": "ppo",
+  "steps": 1,
+  "groups_per_batch": 1,
+  "group_size": 3,
+  "max_turns": 2,
+  "max_tokens": 96,
+  "learning_rate": 1e-05,
+  "chroma_dir": ".chroma_db",
+  "collection_name": "patent_collection",
+  "run_dir": "training_logs/runs/Qwen-Qwen3.5-4B-20260315-155004",
+  "metrics_dir": "training_logs/metrics/Qwen-Qwen3.5-4B-20260315-155004",
+  "traces_dir": "training_logs/traces/Qwen-Qwen3.5-4B-20260315-155004",
+  "wandb_project": null,
+  "wandb_name": null,
+  "finished_at": "2026-03-15T15:50:55",
+  "latest_checkpoint": {
+    "name": "final",
+    "batch": 1,
+    "state_path": "tinker://0e3ead78-ef40-576c-83f7-b250faf64de9:train:0/weights/final",
+    "sampler_path": "tinker://0e3ead78-ef40-576c-83f7-b250faf64de9:train:0/sampler_weights/final"
+  },
+  "training_log": "training_logs/runs/Qwen-Qwen3.5-4B-20260315-155004/training.log"
+}
