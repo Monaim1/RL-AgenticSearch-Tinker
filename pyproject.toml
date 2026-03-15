@@ -25,4 +25,6 @@ dependencies = [
     "tblib>=3.2.2",
     "torchtune>=0.6.1",
     "torchao>=0.14.1",
+    "tinker>=0.15.0",
+    "tinker-cookbook>=0.1.0",
 ]
