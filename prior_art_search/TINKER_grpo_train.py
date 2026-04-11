@@ -4,10 +4,7 @@ import json
 import os
 import random
 import re
-import shutil
-import sys
 import time
-from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
@@ -33,86 +30,22 @@ from tinker_cookbook.rl.types import (
 )
 from tinker_cookbook.utils import logtree
 
+from tinker_logging import (
+    append_tool_trace,
+    create_run_artifacts,
+    disable_cookbook_trajectory_logging,
+    finalize_run,
+    load_json_config,
+    make_run_id,
+    set_tool_trace_file,
+    summarize,
+)
+
 
 DEFAULT_CHROMA_DIR = ".chroma_db"
 DEFAULT_COLLECTION = "patent_collection"
 DEFAULT_TRAINING_LOGS_DIR = "training_logs"
 DEFAULT_CONFIG_PATH = "prior_art_search/TINKER_grpo_train.config.json"
-
-
-class Tee:
-    def __init__(self, *streams: Any):
-        self.streams = streams
-
-    def write(self, data: str) -> int:
-        for stream in self.streams:
-            stream.write(data)
-        return len(data)
-
-    def writelines(self, lines: list[str]) -> None:
-        for stream in self.streams:
-            stream.writelines(lines)
-
-    def flush(self) -> None:
-        for stream in self.streams:
-            stream.flush()
-
-    def isatty(self) -> bool:
-        return any(getattr(stream, "isatty", lambda: False)() for stream in self.streams)
-
-    def __getattr__(self, name: str) -> Any:
-        # Delegate unknown stream methods/properties (e.g., fileno, encoding)
-        # to the primary stream for compatibility with libraries like wandb.
-        return getattr(self.streams[0], name)
-
-
-def make_run_id(model_name: str) -> str:
-    model_tag = model_name.replace("/", "-")
-    ts = time.strftime("%Y%m%d-%H%M%S")
-    return f"{model_tag}-{ts}"
-
-
-def copy_if_exists(src: Path, dst: Path) -> None:
-    if src.exists():
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dst)
-
-
-def persist_run_artifacts(run_dir: Path, metrics_dir: Path, traces_dir: Path) -> None:
-    # Metrics-focused files
-    copy_if_exists(run_dir / "metrics.jsonl", metrics_dir / "metrics.jsonl")
-    copy_if_exists(run_dir / "checkpoints.jsonl", metrics_dir / "checkpoints.jsonl")
-
-    # Trace/logtree-focused files
-    for pattern in ("train_iteration_*.html", "eval_*.html", "trace_events*.jsonl"):
-        for path in run_dir.glob(pattern):
-            copy_if_exists(path, traces_dir / path.name)
-
-
-def read_last_checkpoint(checkpoints_file: Path) -> dict[str, Any] | None:
-    if not checkpoints_file.exists():
-        return None
-    last_line = ""
-    with checkpoints_file.open("r", encoding="utf-8") as f:
-        for line in f:
-            if line.strip():
-                last_line = line.strip()
-    if not last_line:
-        return None
-    try:
-        return json.loads(last_line)
-    except json.JSONDecodeError:
-        return None
-
-
-def load_json_config(config_path: str) -> dict[str, Any]:
-    path = Path(config_path)
-    if not path.exists():
-        return {}
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        raise ValueError(f"Config file must contain a JSON object: {path}")
-    return raw
 
 
 def canonical_pub_id(pub_id: str) -> str:
@@ -144,16 +77,6 @@ def first_json_object(text: str) -> dict[str, Any] | None:
         except json.JSONDecodeError:
             continue
     return None
-
-
-def summarize(result: Any, max_len: int = 240) -> str:
-    try:
-        s = json.dumps(result, ensure_ascii=True)
-    except Exception:
-        s = str(result)
-    if len(s) > max_len:
-        return s[:max_len] + "...(truncated)"
-    return s
 
 
 class PatentTools:
@@ -221,7 +144,6 @@ class PatentScenario:
     publication_number: str
     query: str
 
-
 class PatentSearchEnv(Env):
     def __init__(
         self,
@@ -283,6 +205,8 @@ class PatentSearchEnv(Env):
         reward = 0.0
         done = False
         metrics: Metrics = {"turn": self.turn}
+        args: dict[str, Any] | None = None
+        tool_result: Any = None
 
         parsed = first_json_object(assistant_text)
         tool_name = ""
@@ -293,7 +217,7 @@ class PatentSearchEnv(Env):
             metrics["parse_ok"] = 1.0
             tool_name = parsed["tool"]
             args = parsed.get("arguments", {}) if isinstance(parsed.get("arguments"), dict) else {}
-            tool_result: Any = {}
+            tool_result = {}
 
             try:
                 if tool_name == "search_patents":
@@ -344,6 +268,19 @@ class PatentSearchEnv(Env):
             next_ob = self._build_observation()
 
         metrics["reward"] = reward
+        append_tool_trace(
+            publication_number=self.scenario.publication_number,
+            query=self.scenario.query,
+            turn=self.turn,
+            assistant_text=assistant_text,
+            parsed_action=parsed,
+            tool_name=tool_name or None,
+            tool_args=args,
+            tool_result=tool_result,
+            reward=reward,
+            done=done,
+            metrics=metrics,
+        )
         return StepResult(
             reward=reward,
             episode_done=done,
@@ -534,6 +471,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--remove-constant-reward-groups", action="store_true")
     parser.add_argument("--enable-trace", action="store_true")
+    parser.add_argument("--num-groups-to-log", type=int, default=0)
     parser.add_argument("--max-steps-off-policy", type=int, default=-1)
     if config_defaults:
         valid_dests = {action.dest for action in parser._actions}
@@ -552,17 +490,15 @@ async def async_main(args: argparse.Namespace) -> None:
         raise RuntimeError("Missing TINKER_API_KEY.")
 
     run_id = args.run_id or make_run_id(args.model)
-    training_logs_dir = Path(args.training_logs_dir)
-    run_dir = Path(args.log_path) if args.log_path else training_logs_dir / "runs" / run_id
-    metrics_dir = training_logs_dir / "metrics" / run_id
-    traces_dir = training_logs_dir / "traces" / run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
-    metrics_dir.mkdir(parents=True, exist_ok=True)
-    traces_dir.mkdir(parents=True, exist_ok=True)
-    training_log_file = run_dir / "training.log"
+    artifacts = create_run_artifacts(
+        model_name=args.model,
+        training_logs_dir=args.training_logs_dir,
+        log_path=args.log_path,
+        run_id=run_id,
+    )
 
     run_metadata = {
-        "run_id": run_id,
+        "run_id": artifacts.run_id,
         "started_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "model": args.model,
         "loss_fn": args.loss_fn,
@@ -574,13 +510,16 @@ async def async_main(args: argparse.Namespace) -> None:
         "learning_rate": args.learning_rate,
         "chroma_dir": args.chroma_dir,
         "collection_name": args.collection_name,
-        "run_dir": str(run_dir),
-        "metrics_dir": str(metrics_dir),
-        "traces_dir": str(traces_dir),
+        "num_groups_to_log": args.num_groups_to_log,
+        "run_dir": str(artifacts.run_dir),
+        "metrics_dir": str(artifacts.metrics_dir),
+        "traces_dir": str(artifacts.traces_dir),
+        "logs_file": str(artifacts.logs_file),
+        "tool_trace_file": str(artifacts.tool_trace_file),
         "wandb_project": args.wandb_project or None,
         "wandb_name": args.wandb_name or None,
     }
-    (run_dir / "run_config.json").write_text(
+    (artifacts.run_dir / "run_config.json").write_text(
         json.dumps(run_metadata, indent=2, ensure_ascii=True), encoding="utf-8"
     )
 
@@ -611,7 +550,7 @@ async def async_main(args: argparse.Namespace) -> None:
         max_tokens=args.max_tokens,
         temperature=args.temperature,
         lora_rank=args.rank,
-        log_path=str(run_dir),
+        log_path=str(artifacts.run_dir),
         wandb_project=args.wandb_project or None,
         wandb_name=args.wandb_name or None,
         base_url=args.base_url or None,
@@ -619,41 +558,35 @@ async def async_main(args: argparse.Namespace) -> None:
         save_every=args.save_every,
         remove_constant_reward_groups=args.remove_constant_reward_groups,
         enable_trace=args.enable_trace,
+        num_groups_to_log=args.num_groups_to_log,
         loss_fn=args.loss_fn,  # ppo / importance_sampling from tinker-cookbook
         async_config=async_config,
     )
 
-    with training_log_file.open("a", encoding="utf-8") as log_f:
-        tee_out = Tee(sys.stdout, log_f)
-        tee_err = Tee(sys.stderr, log_f)
-        with redirect_stdout(tee_out), redirect_stderr(tee_err):
-            print("=== TINKER COOKBOOK RL TRAIN (PATENT) ===")
-            print(f"model={args.model} loss_fn={args.loss_fn}")
-            print(
-                f"groups_per_batch={args.groups_per_batch} group_size={args.group_size} "
-                f"steps={args.steps}"
-            )
-            print(f"chroma_dir={args.chroma_dir} collection={args.collection_name}")
-            print(f"run_dir={run_dir}")
-            print(f"metrics_dir={metrics_dir}")
-            print(f"traces_dir={traces_dir}")
-            print(f"training_log={training_log_file}")
-
-            await rl_main(cfg)
-
-    persist_run_artifacts(run_dir=run_dir, metrics_dir=metrics_dir, traces_dir=traces_dir)
-    latest_checkpoint = read_last_checkpoint(run_dir / "checkpoints.jsonl")
-    summary = {
-        **run_metadata,
-        "finished_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-        "latest_checkpoint": latest_checkpoint,
-        "training_log": str(training_log_file),
-    }
-    (run_dir / "run_summary.json").write_text(
-        json.dumps(summary, indent=2, ensure_ascii=True), encoding="utf-8"
+    print("=== TINKER COOKBOOK RL TRAIN (PATENT) ===")
+    print(f"model={args.model} loss_fn={args.loss_fn}")
+    print(
+        f"groups_per_batch={args.groups_per_batch} group_size={args.group_size} "
+        f"steps={args.steps}"
     )
-    (training_logs_dir / "latest_run.json").write_text(
-        json.dumps(summary, indent=2, ensure_ascii=True), encoding="utf-8"
+    print(f"chroma_dir={args.chroma_dir} collection={args.collection_name}")
+    print(f"run_dir={artifacts.run_dir}")
+    print(f"metrics_dir={artifacts.metrics_dir}")
+    print(f"traces_dir={artifacts.traces_dir}")
+    print(f"logs_file={artifacts.logs_file}")
+    print(f"tool_trace_file={artifacts.tool_trace_file}")
+
+    set_tool_trace_file(artifacts.tool_trace_file)
+    disable_cookbook_trajectory_logging()
+    try:
+        await rl_main(cfg)
+    finally:
+        set_tool_trace_file(None)
+
+    finalize_run(
+        artifacts=artifacts,
+        training_logs_dir=args.training_logs_dir,
+        run_metadata=run_metadata,
     )
 
 

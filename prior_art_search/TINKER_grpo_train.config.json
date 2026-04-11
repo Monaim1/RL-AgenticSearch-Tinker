@@ -11,5 +11,6 @@
   "chroma_dir": ".chroma_db",
   "collection_name": "patent_collection",
   "training_logs_dir": "training_logs",
+  "num_groups_to_log": 0,
   "wandb_project": "patent-search-tinker"
 }

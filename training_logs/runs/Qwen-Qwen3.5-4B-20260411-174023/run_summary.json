@@ -1,0 +1,29 @@
+{
+  "run_id": "Qwen-Qwen3.5-4B-20260411-174023",
+  "started_at": "2026-04-11T17:40:23",
+  "model": "Qwen/Qwen3.5-4B",
+  "loss_fn": "ppo",
+  "steps": 1,
+  "groups_per_batch": 1,
+  "group_size": 1,
+  "max_turns": 1,
+  "max_tokens": 40,
+  "learning_rate": 1e-05,
+  "chroma_dir": ".chroma_db",
+  "collection_name": "patent_collection",
+  "num_groups_to_log": 0,
+  "run_dir": "training_logs/runs/Qwen-Qwen3.5-4B-20260411-174023",
+  "metrics_dir": "training_logs/metrics/Qwen-Qwen3.5-4B-20260411-174023",
+  "traces_dir": "training_logs/traces/Qwen-Qwen3.5-4B-20260411-174023",
+  "logs_file": "training_logs/runs/Qwen-Qwen3.5-4B-20260411-174023/logs.log",
+  "tool_trace_file": "training_logs/traces/Qwen-Qwen3.5-4B-20260411-174023/tool_trace.jsonl",
+  "wandb_project": null,
+  "wandb_name": null,
+  "finished_at": "2026-04-11T17:41:03",
+  "latest_checkpoint": {
+    "name": "final",
+    "batch": 1,
+    "state_path": "tinker://96284ab4-6756-547d-935b-937db1c3b8ae:train:0/weights/final",
+    "sampler_path": "tinker://96284ab4-6756-547d-935b-937db1c3b8ae:train:0/sampler_weights/final"
+  }
+}

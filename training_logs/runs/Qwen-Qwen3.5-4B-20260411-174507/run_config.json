@@ -18,12 +18,5 @@
   "logs_file": "training_logs/runs/Qwen-Qwen3.5-4B-20260411-174507/logs.log",
   "tool_trace_file": "training_logs/traces/Qwen-Qwen3.5-4B-20260411-174507/tool_trace.jsonl",
   "wandb_project": null,
-  "wandb_name": null,
-  "finished_at": "2026-04-11T17:45:42",
-  "latest_checkpoint": {
-    "name": "final",
-    "batch": 1,
-    "state_path": "tinker://7e278d80-d9db-56ff-82dc-e52fbe9b6df0:train:0/weights/final",
-    "sampler_path": "tinker://7e278d80-d9db-56ff-82dc-e52fbe9b6df0:train:0/sampler_weights/final"
-  }
+  "wandb_name": null
 }

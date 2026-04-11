@@ -1,0 +1,58 @@
+tinker_cookbook.utils.ml_log:475 [INFO] Logging to: training_logs/runs/Qwen-Qwen3.5-4B-20260411-174507
+tinker_cookbook.checkpoint_utils:21 [INFO] No checkpoints found at training_logs/runs/Qwen-Qwen3.5-4B-20260411-174507/checkpoints.jsonl
+tinker_cookbook.checkpoint_utils:52 [INFO] No checkpoints found with key state_path in training_logs/runs/Qwen-Qwen3.5-4B-20260411-174507
+tinker.lib.internal_client_holder:326 [WARNING] Your Tinker SDK version is outdated. Please upgrade to the latest version.
+tinker.lib.public_interfaces.service_client:75 [INFO] ServiceClient initialized for session 7e278d80-d9db-56ff-82dc-e52fbe9b6df0
+tinker.lib.public_interfaces.service_client:159 [INFO] TrainingClient initialized for model 7e278d80-d9db-56ff-82dc-e52fbe9b6df0:train:0
+chromadb.telemetry.product.posthog:22 [INFO] Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+torchao:91 [WARNING] Skipping import of cpp extensions due to incompatible torch version 2.8.0 for torchao version 0.14.1             Please see https://github.com/pytorch/ao/issues/2919 for more info
+torchao.kernel.intmm:21 [WARNING] Warning: Detected no triton, on systems without Triton certain kernels will not work
+sentence_transformers.SentenceTransformer:227 [INFO] Load pretrained SentenceTransformer: sentence-transformers/all-mpnet-base-v2
+tinker_cookbook.rl.train:1090 [INFO] Will train on 1 batches
+tinker_cookbook.utils.misc_utils:20 [INFO] Starting save_checkpoint
+tinker_cookbook.utils.misc_utils:23 [INFO] save_checkpoint took 1.17 seconds
+tinker_cookbook.utils.misc_utils:20 [INFO] Starting run_evals
+tinker_cookbook.utils.misc_utils:23 [INFO] run_evals took 0.00 seconds
+tinker_cookbook.utils.misc_utils:20 [INFO] Starting assemble_training_data
+tinker_cookbook.utils.misc_utils:23 [INFO] assemble_training_data took 0.02 seconds
+tinker_cookbook.utils.misc_utils:20 [INFO] Starting train
+tinker_cookbook.utils.misc_utils:23 [INFO] train took 2.64 seconds
+tinker_cookbook.utils.misc_utils:20 [INFO] Starting compute_kl_sample_train
+tinker_cookbook.utils.misc_utils:23 [INFO] compute_kl_sample_train took 0.01 seconds
+tinker_cookbook.utils.misc_utils:20 [INFO] Starting save_checkpoint
+tinker_cookbook.utils.misc_utils:23 [INFO] save_checkpoint took 1.73 seconds
+tinker_cookbook.utils.ml_log:143 [INFO] Wrote metrics to training_logs/runs/Qwen-Qwen3.5-4B-20260411-174507/metrics.jsonl
+tinker_cookbook.utils.ml_log:195 [INFO] 
+                    Step 0                     
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃ Metric                         ┃ Value      ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ env/all/ac_tokens_per_turn     │ 40.000000  │
+│ env/all/by_group/frac_all_bad  │ 1.000000   │
+│ env/all/by_group/frac_all_good │ 0.000000   │
+│ env/all/by_group/frac_mixed    │ 0.000000   │
+│ env/all/ob_tokens_per_turn     │ 138.000000 │
+│ env/all/parse_ok               │ 0.000000   │
+│ env/all/reward                 │ 0.000000   │
+│ env/all/reward/total           │ 0.000000   │
+│ env/all/total_ac_tokens        │ 40         │
+│ env/all/total_episodes         │ 1          │
+│ env/all/total_ob_tokens        │ 138        │
+│ env/all/total_turns            │ 1          │
+│ env/all/turn                   │ 1.000000   │
+│ env/all/turns_per_episode      │ 1.000000   │
+│ optim/entropy                  │ 0.270569   │
+│ optim/kl_sample_train_v1       │ 0.047048   │
+│ optim/kl_sample_train_v2       │ 0.008048   │
+│ optim/lr                       │ 0.000010   │
+│ progress/batch                 │ 0          │
+│ progress/done_frac             │ 1.000000   │
+│ time/assemble_training_data    │ 0.016419   │
+│ time/compute_kl_sample_train   │ 0.008579   │
+│ time/run_evals                 │ 0.000105   │
+│ time/save_checkpoint           │ 1.735132   │
+│ time/total                     │ 12.580308  │
+│ time/train                     │ 2.639827   │
+└────────────────────────────────┴────────────┘
+tinker_cookbook.checkpoint_utils:81 [INFO] Saved checkpoints: {'state_path': 'tinker://7e278d80-d9db-56ff-82dc-e52fbe9b6df0:train:0/weights/final', 'sampler_path': 'tinker://7e278d80-d9db-56ff-82dc-e52fbe9b6df0:train:0/sampler_weights/final'}
+tinker_cookbook.rl.train:1126 [INFO] Training completed successfully

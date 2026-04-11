@@ -59,9 +59,9 @@ uv run prior_art_search/TINKER_grpo_train.py --steps 2 --group-size 3
 
 Each run persists to:
 
-- `training_logs/runs/<run_id>/` (full raw run + `training.log`)
+- `training_logs/runs/<run_id>/` (raw cookbook run files such as `logs.log`, `config.json`, `code.diff`)
 - `training_logs/metrics/<run_id>/` (`metrics.jsonl`, `checkpoints.jsonl`)
-- `training_logs/traces/<run_id>/` (logtree/trace artifacts)
+- `training_logs/traces/<run_id>/` (`tool_trace.jsonl`; optional `trace_events*.jsonl`; HTML reports only if `--num-groups-to-log > 0`)
 - `training_logs/latest_run.json` (pointer to latest run + final checkpoint)
 
 ## ART / OpenPipe ART (Legacy)
