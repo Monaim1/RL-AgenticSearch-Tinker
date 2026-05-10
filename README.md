@@ -29,9 +29,8 @@ Build the local retrieval dataset from Hugging Face HUPD:
 uv run python prepare.py --limit 500
 ```
 
-This downloads `HUPD/hupd`, writes `Evals/patent_search_queries.csv`, and builds the
-local Chroma collection in `.chroma_db/`. Retrieval indexes title, abstract, claims,
-classifications, status, and key dates.
+This downloads `HUPD/hupd` and builds the local Chroma collection in `.chroma_db/`.
+Retrieval indexes title, abstract, claims, classifications, status, and key dates.
 
 Then ensure `.env` contains:
 

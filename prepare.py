@@ -1,8 +1,6 @@
 import argparse
-import csv
 import json
 import tarfile
-from pathlib import Path
 
 import chromadb
 from chromadb.utils import embedding_functions
@@ -13,7 +11,6 @@ DATASET = "HUPD/hupd"
 DEFAULT_FILE = "data/sample-jan-2016.tar.gz"
 DEFAULT_CHROMA_DIR = ".chroma_db"
 DEFAULT_COLLECTION = "patent_collection"
-DEFAULT_CSV = "Evals/patent_search_queries.csv"
 
 FIELDS = [
     "publication_number",
@@ -84,23 +81,6 @@ def load_hupd(limit: int, hf_file: str) -> list[dict]:
     return patents
 
 
-def write_eval_csv(patents: list[dict], csv_path: str) -> None:
-    path = Path(csv_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    with path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["publication_number", "query", "abstract"])
-        writer.writeheader()
-        for patent in patents:
-            writer.writerow(
-                {
-                    "publication_number": patent["publication_number"],
-                    "query": patent["title"],
-                    "abstract": patent["abstract"],
-                }
-            )
-
-
 def build_chroma(patents: list[dict], chroma_dir: str, collection_name: str) -> None:
     client = chromadb.PersistentClient(path=chroma_dir)
     try:
@@ -133,7 +113,6 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int, default=500)
     parser.add_argument("--hf-file", default=DEFAULT_FILE)
-    parser.add_argument("--csv-path", default=DEFAULT_CSV)
     parser.add_argument("--chroma-dir", default=DEFAULT_CHROMA_DIR)
     parser.add_argument("--collection-name", default=DEFAULT_COLLECTION)
     args = parser.parse_args()
@@ -142,11 +121,9 @@ def main() -> None:
     if len(patents) < 10:
         raise ValueError(f"Need at least 10 usable patents, got {len(patents)}")
 
-    write_eval_csv(patents, args.csv_path)
     build_chroma(patents, args.chroma_dir, args.collection_name)
 
     print(f"Prepared {len(patents)} patents")
-    print(f"Wrote {args.csv_path}")
     print(f"Built Chroma collection '{args.collection_name}' in {args.chroma_dir}")
 
 
