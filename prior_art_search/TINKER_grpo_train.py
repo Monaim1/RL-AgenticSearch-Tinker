@@ -123,8 +123,8 @@ class PatentTools:
         result = self.collection.get(ids=[publication_number])
         if result and result.get("metadatas"):
             metadata = result["metadatas"][0] or {}
-            abstract = (result.get("documents") or [""])[0]
-            return {**metadata, "abstract": abstract}
+            search_text = (result.get("documents") or [""])[0]
+            return {**metadata, "search_text": search_text}
 
         canonical = canonical_pub_id(publication_number)
         fallback_id = self.ids_by_canonical.get(canonical)
@@ -135,8 +135,8 @@ class PatentTools:
         if not result or not result.get("metadatas"):
             raise ValueError(f"No patent found for {publication_number}")
         metadata = result["metadatas"][0] or {}
-        abstract = (result.get("documents") or [""])[0]
-        return {**metadata, "abstract": abstract}
+        search_text = (result.get("documents") or [""])[0]
+        return {**metadata, "search_text": search_text}
 
 
 @dataclass

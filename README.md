@@ -23,14 +23,17 @@ It uses:
 
 ### One-time setup
 
-1. Put patent JSON files in `Patent_data/`.
-2. Build local Chroma collection:
+Build the local retrieval dataset from Hugging Face HUPD:
 
 ```bash
-WANDB_API_KEY=dummy uv run python prior_art_search/local_patent_db.py
+uv run python prepare.py --limit 500
 ```
 
-3. Ensure `.env` contains:
+This downloads `HUPD/hupd`, writes `Evals/patent_search_queries.csv`, and builds the
+local Chroma collection in `.chroma_db/`. Retrieval indexes title, abstract, claims,
+classifications, status, and key dates.
+
+Then ensure `.env` contains:
 
 ```env
 TINKER_API_KEY=...
