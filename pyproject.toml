@@ -17,7 +17,6 @@ dependencies = [
     "openpipe-art==0.5.2",
     "dspy>=3.0.4",
     "unsloth>=2024.8",
-    "vllm>=0.11.0",
     "mlx-lm>=0.28.3",
     "weave>=0.51.56",
     "langchain-core>=1.0.5",
